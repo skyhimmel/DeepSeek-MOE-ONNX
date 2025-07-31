@@ -1,0 +1,52 @@
+from torch import nn 
+import torch 
+import onnx 
+import netron
+import onnxruntime
+from DeepSeek_MOE import DeepSeekMoE
+from config import * 
+from dataset import MNIST
+from torch.utils.data import DataLoader
+import time 
+
+EPOCH=10
+BATCH_SIZE=64 
+
+dataset=MNIST() # 数据集
+dataloader=DataLoader(dataset,batch_size=BATCH_SIZE,num_workers=10,persistent_workers=True)    # 数据加载器
+
+model=DeepSeekMoE(INPUT_SIZE,EMB_SIZE,10,EXPERTS,TOP) # 模型
+model.load_state_dict(torch.load('/RAID5/projects/yangjianxin/subjects/DeepSeek-MOE-ONNX/model.pth'))
+
+model=torch.jit.script(model) # 带控制流的静态图导出
+
+model.eval()    # 预测模式
+
+# 导出onnx格式
+torch.onnx.export(model,torch.rand((BATCH_SIZE,1,28,28)),f='model.onnx')
+
+# 检查onnx导出正确
+onnx_model=onnx.load('model.onnx')
+onnx.checker.check_model(onnx_model)
+
+# 推理
+sess=onnxruntime.InferenceSession('model.onnx',providers=['CPUExecutionProvider'])
+
+start_time=time.time()
+
+correct=0
+for epoch in range(EPOCH):
+    for img,label in dataloader:
+        batch_size=img.size(0)
+        if img.size(0)!=BATCH_SIZE: # onnx输入尺寸固定，最后1个batch要补齐
+            fills=torch.zeros(BATCH_SIZE-img.size(0),1,28,28)
+            img=torch.concat((img,fills),dim=0)
+        outputs=sess.run(output_names=None,input_feed={sess.get_inputs()[0].name:img.numpy()})  # 输入&输出
+        logits=outputs[0][:batch_size]
+
+        correct+=(logits.argmax(-1)==label.numpy()).sum()
+
+print('正确率:%.2f'%(correct/(len(dataset)*EPOCH)*100),'耗时:',time.time()-start_time,'s')
+
+# 展示onnx模型
+netron.start('model.onnx')
