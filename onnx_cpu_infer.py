@@ -16,7 +16,7 @@ dataset=MNIST() # 数据集
 dataloader=DataLoader(dataset,batch_size=BATCH_SIZE,num_workers=10,persistent_workers=True)    # 数据加载器
 
 model=DeepSeekMoE(INPUT_SIZE,EMB_SIZE,10,EXPERTS,TOP) # 模型
-model.load_state_dict(torch.load('/RAID5/projects/yangjianxin/subjects/DeepSeek-MOE-ONNX/model.pth'))
+model.load_state_dict(torch.load('model.pth'))
 
 model=torch.jit.script(model) # 带控制流的静态图导出
 
