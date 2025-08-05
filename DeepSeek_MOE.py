@@ -22,6 +22,24 @@ class Expert(nn.Module):
         x = self.fc3(x)
         return x
 
+class LoRAExpert(nn.Module):
+    """单个专家网络"""
+    def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.1, r=8):
+        super(LoRAExpert, self).__init__()
+        self.fc1 = nn.Linear(input_dim, r)
+        self.fc2 = nn.Linear(r, r)
+        self.fc3 = nn.Linear(r, output_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.activation = nn.ReLU()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        x = self.dropout(x)
+        x = self.activation(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
+        return x
+
 class TopKGate(nn.Module):
     """Top-K门控机制，参考DeepSeek实现"""
     def __init__(self, input_dim, num_experts, top_k=2, noise_std=1.0):
